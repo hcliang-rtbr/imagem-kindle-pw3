@@ -9,6 +9,11 @@ on:
 permissions:
   contents: write           # necessario para commitar a imagem
 
+# Impede que duas execucoes rodem ao mesmo tempo e colidam no push.
+concurrency:
+  group: gerar-dashboard
+  cancel-in-progress: false
+
 jobs:
   gerar:
     runs-on: ubuntu-latest
@@ -36,5 +41,6 @@ jobs:
             echo "Nada mudou, nada a commitar."
           else
             git commit -m "dash: atualizacao automatica $(date -u '+%Y-%m-%d %H:%M UTC')"
-            git push
+            git pull --rebase origin main
+            git push origin main
           fi
