@@ -36,11 +36,21 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Guarda a imagem recem gerada fora da arvore do Git.
+          cp dash.png /tmp/dash.png
+
+          # Sincroniza a branch com o remoto, descartando divergencias.
+          git fetch origin main
+          git reset --hard origin/main
+
+          # Devolve a imagem nova por cima da versao do remoto.
+          cp /tmp/dash.png dash.png
+
           git add dash.png
           if git diff --staged --quiet; then
             echo "Nada mudou, nada a commitar."
           else
             git commit -m "dash: atualizacao automatica $(date -u '+%Y-%m-%d %H:%M UTC')"
-            git pull --rebase origin main
             git push origin main
           fi
