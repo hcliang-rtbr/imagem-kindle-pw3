@@ -11,6 +11,7 @@ Requisitos: pip install pillow requests
 
 import math
 import sys
+import time
 from datetime import datetime, timezone, timedelta
 
 import requests
@@ -79,9 +80,27 @@ def buscar_clima():
         "timezone": TZ_NOME,
         "forecast_days": 4,
     }
-    r = requests.get(url, params=params, timeout=30)
-    r.raise_for_status()
-    return r.json()
+    # A API do Open-Meteo devolve 500 esporadicamente. Tenta algumas vezes
+    # com espera crescente antes de desistir.
+    esperas = [5, 15, 30, 60]
+    ultimo_erro = None
+    for tentativa, espera in enumerate(esperas + [None], start=1):
+        try:
+            r = requests.get(url, params=params, timeout=30)
+            if r.status_code >= 500:
+                raise requests.HTTPError(
+                    f"{r.status_code} Server Error para {r.url}", response=r)
+            r.raise_for_status()
+            return r.json()
+        except (requests.ConnectionError, requests.Timeout, requests.HTTPError) as e:
+            ultimo_erro = e
+            if espera is None:
+                break
+            print(f"AVISO: tentativa {tentativa} falhou ({e}); "
+                  f"nova tentativa em {espera}s", file=sys.stderr)
+            time.sleep(espera)
+    raise RuntimeError(f"Open-Meteo indisponivel apos {len(esperas) + 1} "
+                       f"tentativas: {ultimo_erro}")
 
 
 def rosa_dos_ventos(graus):
@@ -269,6 +288,11 @@ def gerar():
 if __name__ == "__main__":
     try:
         gerar()
+    except RuntimeError as e:
+        # API fora do ar mesmo apos as retentativas: mantem o dash.png
+        # anterior e nao marca o workflow como falho.
+        print(f"AVISO: {e}. Mantendo a imagem anterior.", file=sys.stderr)
+        sys.exit(0)
     except Exception as e:
         print(f"ERRO: {e}", file=sys.stderr)
         sys.exit(1)
